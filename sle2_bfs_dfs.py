@@ -1,14 +1,12 @@
+
 from collections import deque
-import timeit
-
+import argparse
 
 # ==========================================================
-# SLE-2: BFS vs DFS Empirical Performance Analysis
+# SLE-2: BFS vs DFS using py-spy
 # ==========================================================
 
-# ----------------------------------------------------------
 # 1. Graph Definition
-# ----------------------------------------------------------
 
 graph = {
     'A': ['B', 'C'],
@@ -25,9 +23,7 @@ graph = {
 }
 
 
-# ----------------------------------------------------------
 # 2. BFS Algorithm
-# ----------------------------------------------------------
 
 def bfs(graph, start, goal):
     queue = deque([(start, [start])])
@@ -48,14 +44,14 @@ def bfs(graph, start, goal):
 
         for neighbour in graph[current]:
             if neighbour not in visited:
-                queue.append((neighbour, path + [neighbour]))
+                queue.append(
+                    (neighbour, path + [neighbour])
+                )
 
     return None, nodes_expanded
 
 
-# ----------------------------------------------------------
 # 3. DFS Algorithm
-# ----------------------------------------------------------
 
 def dfs(graph, start, goal):
     stack = [(start, [start])]
@@ -76,156 +72,80 @@ def dfs(graph, start, goal):
 
         for neighbour in reversed(graph[current]):
             if neighbour not in visited:
-                stack.append((neighbour, path + [neighbour]))
+                stack.append(
+                    (neighbour, path + [neighbour])
+                )
 
     return None, nodes_expanded
 
 
-# ----------------------------------------------------------
 # 4. Experiment Settings
-# ----------------------------------------------------------
 
 START_NODE = 'A'
 GOAL_NODE = 'I'
 
-NUMBER_OF_RUNS = 10
-
-# Number of times the algorithm is executed
-# inside each timing measurement.
-REPETITIONS_PER_RUN = 10000
+# Repeat searches to give py-spy enough work to sample.
+REPETITIONS = 100_000
 
 
-# ----------------------------------------------------------
-# 5. Measure BFS
-# ----------------------------------------------------------
+# 5. Workload to Profile
 
-bfs_times = []
+def run_bfs_workload():
+    for _ in range(REPETITIONS):
+        bfs(graph, START_NODE, GOAL_NODE)
 
-for _ in range(NUMBER_OF_RUNS):
 
-    elapsed_time = timeit.timeit(
-        lambda: bfs(graph, START_NODE, GOAL_NODE),
-        number=REPETITIONS_PER_RUN
+def run_dfs_workload():
+    for _ in range(REPETITIONS):
+        dfs(graph, START_NODE, GOAL_NODE)
+
+
+# 6. Display Results
+
+def display_results(algorithm_name, search_function):
+    path, nodes_expanded = search_function(
+        graph, START_NODE, GOAL_NODE
     )
 
-    # Average time for one BFS execution
-    average_time = (elapsed_time / REPETITIONS_PER_RUN) * 1000
+    print("=" * 60)
+    print("SLE-2: BFS vs DFS using py-spy")
+    print("=" * 60)
 
-    bfs_times.append(average_time)
+    print("Algorithm            :", algorithm_name)
+    print("Start Node            :", START_NODE)
+    print("Goal Node             :", GOAL_NODE)
+    print("Search Repetitions    :", REPETITIONS)
+    print("Path Found            :", " -> ".join(path)
+          if path else "No path found")
+    print("Nodes Expanded        :", nodes_expanded)
+
+    print("-" * 60)
+    print("Execution-time profiling is performed by py-spy.")
+    print("Inspect the generated profile for sampled activity.")
+    print("=" * 60)
 
 
-# Get BFS result and node count
-bfs_path, bfs_nodes = bfs(
-    graph,
-    START_NODE,
-    GOAL_NODE
-)
+# 7. Select Which Algorithm to Profile
 
-bfs_average_time = sum(bfs_times) / NUMBER_OF_RUNS
-
-
-# ----------------------------------------------------------
-# 6. Measure DFS
-# ----------------------------------------------------------
-
-dfs_times = []
-
-for _ in range(NUMBER_OF_RUNS):
-
-    elapsed_time = timeit.timeit(
-        lambda: dfs(graph, START_NODE, GOAL_NODE),
-        number=REPETITIONS_PER_RUN
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Profile BFS or DFS using py-spy"
     )
 
-    # Average time for one DFS execution
-    average_time = (elapsed_time / REPETITIONS_PER_RUN) * 1000
+    parser.add_argument(
+        "algorithm",
+        choices=["bfs", "dfs"],
+        help="Choose bfs or dfs"
+    )
 
-    dfs_times.append(average_time)
+    args = parser.parse_args()
 
+    if args.algorithm == "bfs":
+        display_results("BFS", bfs)
+        run_bfs_workload()
 
-# Get DFS result and node count
-dfs_path, dfs_nodes = dfs(
-    graph,
-    START_NODE,
-    GOAL_NODE
-)
+    else:
+        display_results("DFS", dfs)
+        run_dfs_workload()
 
-dfs_average_time = sum(dfs_times) / NUMBER_OF_RUNS
-
-
-# ----------------------------------------------------------
-# 7. Determine Which Used Less Time
-# ----------------------------------------------------------
-
-if bfs_average_time < dfs_average_time:
-    faster_algorithm = "BFS"
-elif dfs_average_time < bfs_average_time:
-    faster_algorithm = "DFS"
-else:
-    faster_algorithm = "Same"
-
-
-# ----------------------------------------------------------
-# 8. Display Results
-# ----------------------------------------------------------
-
-print("=" * 65)
-print("SLE-2: BFS vs DFS Empirical Performance Analysis")
-print("=" * 65)
-
-print("\nEXPERIMENT DETAILS")
-print("-" * 65)
-print("Problem              : Small graph search")
-print(f"Start Node            : {START_NODE}")
-print(f"Goal Node             : {GOAL_NODE}")
-print(f"Experimental Runs     : {NUMBER_OF_RUNS}")
-print(f"Repetitions per Run   : {REPETITIONS_PER_RUN}")
-
-print("\n" + "=" * 65)
-
-print("BFS RESULTS")
-print("=" * 65)
-
-print("Path Found            :", " -> ".join(bfs_path))
-print("Nodes Expanded        :", bfs_nodes)
-print(f"Average Time (ms)     : {bfs_average_time:.6f}")
-
-print("\n" + "=" * 65)
-
-print("DFS RESULTS")
-print("=" * 65)
-
-print("Path Found            :", " -> ".join(dfs_path))
-print("Nodes Expanded        :", dfs_nodes)
-print(f"Average Time (ms)     : {dfs_average_time:.6f}")
-
-print("\n" + "=" * 65)
-
-print("FINAL COMPARISON")
-print("=" * 65)
-
-print(
-    f"{'Metric':<25}"
-    f"{'BFS':<18}"
-    f"{'DFS':<18}"
-)
-
-print("-" * 65)
-
-print(
-    f"{'Average Time (ms)':<25}"
-    f"{bfs_average_time:<18.6f}"
-    f"{dfs_average_time:<18.6f}"
-)
-
-print(
-    f"{'Nodes Expanded':<25}"
-    f"{bfs_nodes:<18}"
-    f"{dfs_nodes:<18}"
-)
-
-print("-" * 65)
-
-print(f"Lower Execution Time : {faster_algorithm}")
-
-print("=" * 65)
+    print("Profiling workload completed.")
